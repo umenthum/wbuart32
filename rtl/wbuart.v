@@ -68,9 +68,9 @@ module	wbuart(i_clk, i_rst,
 	// Wishbone inputs
 	input	wire		i_wb_cyc;	// We ignore CYC for efficiency
 	input	wire		i_wb_stb, i_wb_we;
-	input	wire	[1:0]	i_wb_addr;
+	input	wire	[1:0]	i_wb_addr /* verilator sc_bv */;
 	input	wire	[31:0]	i_wb_data;
-	input	wire	[3:0]	i_wb_sel;
+	input	wire	[3:0]	i_wb_sel /* verilator sc_bv */;
 	output	wire		o_wb_stall;
 	output	reg		o_wb_ack;
 	output	reg	[31:0]	o_wb_data;
@@ -105,7 +105,7 @@ module	wbuart(i_clk, i_rst,
 		// Under wishbone rules, a write takes place any time i_wb_stb
 		// is high.  If that's the case, and if the write was to the
 		// setup address, then set us up for the new parameters.
-		if ((i_wb_stb)&&(i_wb_addr == `UART_SETUP)&&(i_wb_we))
+		if ((i_wb_stb)&&(i_wb_addr == `UART_SETUP)&&(i_wb_we)&&(i_wb_sel[3]))
 			uart_setup <= {
 				(i_wb_data[30])
 					||(!HARDWARE_FLOW_CONTROL_PRESENT),
@@ -216,7 +216,7 @@ module	wbuart(i_clk, i_rst,
 			// Clear the error
 			r_rx_perr <= 1'b0;
 			r_rx_ferr <= 1'b0;
-		end else if ((i_wb_stb)
+		end else if ((i_wb_stb)&&(i_wb_sel[1])
 				&&(i_wb_addr[1:0]==`UART_RXREG)&&(i_wb_we))
 		begin
 			// Reset the error lines if a '1' is ever written to
@@ -242,7 +242,7 @@ module	wbuart(i_clk, i_rst,
 			// The receiver reset, always set on a master reset
 			// request.
 			rx_uart_reset <= 1'b1;
-		else if ((i_wb_stb)&&(i_wb_addr[1:0]==`UART_RXREG)&&(i_wb_we))
+		else if ((i_wb_stb)&&(i_wb_addr[1:0]==`UART_RXREG)&&(i_wb_we)&&i_wb_sel[1])
 			// Writes to the receive register will command a receive
 			// reset anytime bit[12] is set.
 			rx_uart_reset <= i_wb_data[12];
@@ -285,7 +285,7 @@ module	wbuart(i_clk, i_rst,
 	always @(posedge i_clk)
 	begin
 		txf_wb_write <= (i_wb_stb)&&(i_wb_addr == `UART_TXREG)
-					&&(i_wb_we);
+					&&(i_wb_we)&&(i_wb_sel[0]);
 		txf_wb_data  <= i_wb_data[7:0];
 	end
 
@@ -327,7 +327,7 @@ module	wbuart(i_clk, i_rst,
 	always @(posedge i_clk)
 		if (i_rst)
 			r_tx_break <= 1'b0;
-		else if ((i_wb_stb)&&(i_wb_addr[1:0]==`UART_TXREG)&&(i_wb_we))
+		else if ((i_wb_stb)&&(i_wb_addr[1:0]==`UART_TXREG)&&(i_wb_we)&&(i_wb_sel[1]))
 			r_tx_break <= i_wb_data[9];
 	assign	tx_break = r_tx_break;
 `else
@@ -344,7 +344,7 @@ module	wbuart(i_clk, i_rst,
 	always @(posedge i_clk)
 		if((i_rst)||((i_wb_stb)&&(i_wb_addr == `UART_SETUP)&&(i_wb_we)))
 			tx_uart_reset <= 1'b1;
-		else if ((i_wb_stb)&&(i_wb_addr[1:0]==`UART_TXREG)&&(i_wb_we))
+		else if ((i_wb_stb)&&(i_wb_addr[1:0]==`UART_TXREG)&&(i_wb_we)&&(i_wb_sel[1]))
 			tx_uart_reset <= i_wb_data[12];
 		else
 			tx_uart_reset <= 1'b0;
@@ -433,7 +433,7 @@ module	wbuart(i_clk, i_rst,
 	// Make verilator happy
 	// verilator lint_off UNUSED
 	wire	unused;
-	assign	unused = &{ 1'b0, i_rst, i_wb_cyc, i_wb_data, i_wb_sel };
+	assign	unused = &{ 1'b0, i_rst, i_wb_cyc, i_wb_sel };
 	// verilator lint_on UNUSED
 
 endmodule
